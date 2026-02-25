@@ -1,0 +1,1 @@
+To test a client: nc localhost 1234
