@@ -239,8 +239,8 @@ if __name__ == "__main__":
     n = 0
     new_topics = []
     
-    topics = generate_topic_list(10)
-    topics = ["top canadian provinces/territories by population"]
+    # topics = generate_topic_list(10)
+    topics = ["top 20 canadian universities by enrollment"]
     for topic in topics:
         filename = topic_to_filename(topic)
         out_file = os.path.join(questions_dir, f"{filename}.js")

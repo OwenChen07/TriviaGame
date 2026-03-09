@@ -13,7 +13,10 @@ interface RankedItem {
   image?: string | null;
 }
 
-const WS_URL = process.env.REACT_APP_WS_URL || "ws://localhost:1234";
+const WS_URL = process.env.REACT_APP_WS_URL ||
+  (window.location.hostname === "localhost"
+    ? "ws://localhost:1234"
+    : "wss://triviagame-meli.onrender.com");
 
 export default function App() {
   const [name, setName] = useState("");

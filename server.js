@@ -1,10 +1,23 @@
 import { WebSocketServer } from "ws";
+import { createServer } from "node:http";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const PORT = Number(process.env.PORT) || 1234;
-const wss = new WebSocketServer({ port: PORT });
+
+const httpServer = createServer((req, res) => {
+    if (req.url === "/health") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ status: "ok" }));
+        return;
+    }
+
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    res.end("TriviaGame WebSocket server is running");
+});
+
+const wss = new WebSocketServer({ server: httpServer });
 
 const rooms = {};
 
@@ -360,4 +373,6 @@ wss.on("connection", (ws) => {
 });
 
 await loadQuestionPool();
-console.log(`Server running on port ${PORT}`);
+httpServer.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
