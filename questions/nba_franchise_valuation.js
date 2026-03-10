@@ -1,0 +1,36 @@
+export const question = 
+    {
+        prompt: "Rank NBA teams by franchise valuation (2023)",
+        items: [
+            { item: "Golden State Warriors", number: 11040000000, image: "" },
+                { item: "Los Angeles Lakers", number: 10000000000, image: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Los_Angeles_Lakers_logo.svg/500px-Los_Angeles_Lakers_logo.svg.png" },
+                { item: "New York Knicks", number: 9900000000, image: "" },
+                { item: "Los Angeles Clippers", number: 7040000000, image: "" },
+                { item: "Boston Celtics", number: 6450000000, image: "" },
+                { item: "Chicago Bulls", number: 6190000000, image: "" },
+                { item: "Brooklyn Nets", number: 5940000000, image: "" },
+                { item: "Houston Rockets", number: 5920000000, image: "" },
+                { item: "Miami Heat", number: 5921000000, image: "" },
+                { item: "Philadelphia 76ers", number: 5720000000, image: "" },
+                { item: "Toronto Raptors", number: 5320000000, image: "" },
+                { item: "Dallas Mavericks", number: 5280000000, image: "" },
+                { item: "Phoenix Suns", number: 5270000000, image: "" },
+                { item: "Atlanta Hawks", number: 5140000000, image: "" },
+                { item: "Cleveland Cavaliers", number: 4930000000, image: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Cleveland_Cavaliers_logo.svg/500px-Cleveland_Cavaliers_logo.svg.png" },
+                { item: "Sacramento Kings", number: 4900000000, image: "" },
+                { item: "Washington Wizards", number: 4770000000, image: "" },
+                { item: "Denver Nuggets", number: 4700000000, image: "" },
+                { item: "Milwaukee Bucks", number: 4440000000, image: "" },
+                { item: "San Antonio Spurs", number: 4400000000, image: "" },
+                { item: "Indiana Pacers", number: 4380000000, image: "" },
+                { item: "Oklahoma City Thunder", number: 4310000000, image: "" },
+                { item: "Utah Jazz", number: 4240000000, image: "" },
+                { item: "Portland Trail Blazers", number: 4200000000, image: "" },
+                { item: "Orlando Magic", number: 4050000000, image: "" },
+                { item: "Charlotte Hornets", number: 3940000000, image: "" },
+                { item: "Minnesota Timberwolves", number: 3890000000, image: "" },
+                { item: "Detroit Pistons", number: 3850000000, image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c9/Logo_of_the_Detroit_Pistons.svg/500px-Logo_of_the_Detroit_Pistons.svg.png" },
+                { item: "New Orleans Pelicans", number: 3800000000, image: "" },
+                { item: "Memphis Grizzlies", number: 3750000000, image: "" }
+        ]
+    };

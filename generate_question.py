@@ -111,10 +111,25 @@ def generate_items_with_llm(topic: str, context: str) -> dict:
         stop=None,
     )
     for chunk in completion:
-        full_response += chunk.choices[0].delta.content or ""
+        delta = chunk.choices[0].delta
+        if delta and delta.content:
+            full_response += delta.content
+
+    if not full_response.strip():
+        raise ValueError(
+            f"LLM returned an empty response for topic: {topic!r}. "
+            "This may be a model error, rate limit, or unsupported model name."
+        )
 
     clean = re.sub(r"```(?:json)?", "", full_response).strip().strip("`").strip()
-    return json.loads(clean)
+
+    try:
+        return json.loads(clean)
+    except json.JSONDecodeError as e:
+        print(f"\n[ERROR] Failed to parse LLM response as JSON.")
+        print(f"  JSON error: {e}")
+        print(f"  Raw response (first 500 chars):\n{full_response[:500]}")
+        raise
 
 
 # ── Step 5: Fetch images + assemble final result ──────────────────────────────
@@ -199,19 +214,30 @@ def generate_topic_list(n: int = 20) -> list[str]:
     system_prompt = (
         "You are a trivia game designer. Generate a list of ranking trivia topics that are "
         "engaging, well-known, and suitable for a general audience. "
-        "Each topic should be something most people have a rough intuition about — "
-        "they should be able to make educated guesses even without expert knowledge.\n\n"
-        "Good topic types include: populations, sizes, speeds, wealth, ages, distances, counts.\n"
-        "Good subject types include: countries, cities, animals, companies, athletes, movies, sports teams.\n\n"
+        "Each topic should involve ranking ALL items in a well-defined category, rather than "
+        "just the top N items. The goal is for players to rank the full category.\n\n"
+
+        "Topics should involve categories that people have some intuition about, such as "
+        "countries, cities, sports teams, animals, companies, universities, movies, etc.\n\n"
+
         "Rules:\n"
-        "- Each topic must specify a clear numeric metric to rank by (e.g. 'by population', 'by box office revenue')\n"
-        "- Each topic must specify a quantity (e.g. 'top 20', 'top 15')\n"
-        "- Each topic must have at least 20 items to rank (to ensure enough variety and challenge)\n"
-        "- Topics should be diverse — mix geography, sports, entertainment, nature, business\n"
+        "- Each topic must rank a complete category (e.g. 'all NBA teams', 'all Canadian provinces', "
+        "'all US states', 'all Premier League teams in the 2023–24 season')\n"
+        "- Each topic must specify a clear numeric metric to rank by "
+        "(e.g. 'by population', 'by area', 'by franchise value', 'by enrollment')\n"
+        "- The category must contain at least 20 items\n"
+        "- Topics should be diverse — mix geography, sports, entertainment, nature, and business\n"
+        "- Categories should be stable and well-known\n"
         "- Avoid obscure or highly technical topics\n"
-        "- Avoid topics that change too frequently to be reliable (e.g. stock prices today)\n\n"
-        "Respond ONLY with a valid Python list of strings, nothing else. No markdown, no explanation.\n"
-        'Example format: ["top 20 countries by population", "top 15 fastest land animals by speed"]'
+        "- Avoid rapidly changing metrics like daily rankings or stock prices\n\n"
+
+        "Examples of good topics:\n"
+        "- 'all Canadian universities by enrollment'\n"
+        "- 'all NBA teams by franchise value'\n"
+        "- 'all US states by population'\n"
+
+        "Respond ONLY with a valid Python list of strings, nothing else. "
+        "No markdown, no explanation."
     )
 
     user_prompt = f"Generate {n} diverse and engaging ranking trivia topics."
@@ -222,7 +248,7 @@ def generate_topic_list(n: int = 20) -> list[str]:
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": user_prompt},
         ],
-        temperature=0.8,   # higher temp for more variety
+        temperature=1.5,   # higher temp for more variety
         max_completion_tokens=1024,
         stream=False,
     )
@@ -239,8 +265,8 @@ if __name__ == "__main__":
     n = 0
     new_topics = []
     
-    # topics = generate_topic_list(10)
-    topics = ["top 20 canadian universities by enrollment"]
+    topics = generate_topic_list(10)
+    # topics = ["all canadian universities by enrollment"]
     for topic in topics:
         filename = topic_to_filename(topic)
         out_file = os.path.join(questions_dir, f"{filename}.js")
