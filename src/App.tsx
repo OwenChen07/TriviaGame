@@ -5,6 +5,8 @@ type Status = "idle" | "lobby" | "playing" | "waiting" | "round_results" | "elim
 interface Result {
   name: string;
   score: number;
+  lives: number;
+  eliminated?: boolean;
 }
 
 interface RankedItem {
@@ -28,8 +30,8 @@ export default function App() {
   const [results, setResults] = useState<Result[]>([]);
   const [winner, setWinner] = useState("");
   const [round, setRound] = useState(1);
-  const [eliminatedPlayer, setEliminatedPlayer] = useState("");
-  const [roundTie, setRoundTie] = useState(false);
+  const [lifeLostPlayers, setLifeLostPlayers] = useState<string[]>([]);
+  const [eliminatedPlayers, setEliminatedPlayers] = useState<string[]>([]);
   const [remainingPlayers, setRemainingPlayers] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [prompt, setPrompt] = useState("");
@@ -74,8 +76,8 @@ export default function App() {
         setItems(msg.items);
         setSubmittedOrder([]);
         setCorrectOrder([]);
-        setEliminatedPlayer("");
-        setRoundTie(false);
+        setLifeLostPlayers([]);
+        setEliminatedPlayers([]);
         setRemainingPlayers([]);
         setStatus("playing");
         startTimer(msg.timeLimit, msg.items);
@@ -85,11 +87,11 @@ export default function App() {
         clearInterval(timerRef.current!);
         setResults(msg.results);
         setCorrectOrder(msg.correct);
-        setEliminatedPlayer(msg.eliminated || "");
-        setRoundTie(Boolean(msg.tie));
+        setLifeLostPlayers(msg.lifeLostPlayers || []);
+        setEliminatedPlayers(msg.eliminatedPlayers || []);
         setRemainingPlayers(msg.remainingPlayers || []);
         setWinner(msg.results?.[0]?.name || "");
-        setStatus(msg.eliminated === name ? "eliminated" : "round_results");
+        setStatus((msg.eliminatedPlayers || []).includes(name) ? "eliminated" : "round_results");
       }
 
       if (msg.type === "game_over") {
@@ -97,7 +99,8 @@ export default function App() {
         setResults(msg.results);
         setWinner(msg.winner);
         setCorrectOrder(msg.correct || []);
-        setRoundTie(false);
+        setLifeLostPlayers([]);
+        setEliminatedPlayers([]);
         setStatus("finished");
       }
     };
@@ -163,8 +166,8 @@ export default function App() {
     setResults([]);
     setWinner("");
     setRound(1);
-    setEliminatedPlayer("");
-    setRoundTie(false);
+    setLifeLostPlayers([]);
+    setEliminatedPlayers([]);
     setRemainingPlayers([]);
     setError("");
     setPrompt("");
@@ -179,8 +182,8 @@ export default function App() {
     setResults([]);
     setWinner("");
     setRound(1);
-    setEliminatedPlayer("");
-    setRoundTie(false);
+    setLifeLostPlayers([]);
+    setEliminatedPlayers([]);
     setRemainingPlayers([]);
     setError("");
     setPrompt("");
@@ -327,15 +330,53 @@ export default function App() {
       {status === "round_results" && (
         <div>
           <h2>Round {round} Results</h2>
-          {roundTie && <p style={{ color: "#92400e", fontWeight: "bold" }}>Tie for lowest score — no one was eliminated</p>}
-          {eliminatedPlayer && <p style={{ color: "#b91c1c", fontWeight: "bold" }}>{eliminatedPlayer} was eliminated</p>}
+          {lifeLostPlayers.length > 0 && (
+            <p style={{ color: "#92400e", fontWeight: "bold" }}>
+              {lifeLostPlayers.join(", ")} lost 1 life{lifeLostPlayers.length > 1 ? " each" : ""}
+            </p>
+          )}
+          {eliminatedPlayers.length > 0 && (
+            <p style={{ color: "#b91c1c", fontWeight: "bold" }}>
+              {eliminatedPlayers.join(", ")} {eliminatedPlayers.length === 1 ? "was" : "were"} eliminated
+            </p>
+          )}
           {remainingPlayers.length > 0 && <p>Remaining: {remainingPlayers.join(", ")}</p>}
 
           {results.map((r, i) => (
             <p key={r.name}>
-              #{i + 1} {r.name}: <strong>{r.score} / 100</strong>
+              #{i + 1} {r.name}: <strong>{r.score} / 100</strong> · ❤️ {r.lives}
+              {r.eliminated ? " (eliminated)" : ""}
             </p>
           ))}
+
+          <h3>Your Order</h3>
+          {submittedOrder.map((item, i) => {
+            const isCorrect = item.item === correctOrder[i]?.item;
+            return (
+              <div
+                key={item.item}
+                style={{
+                  padding: "8px",
+                  marginBottom: "4px",
+                  backgroundColor: isCorrect ? "#dcfce7" : "#fee2e2",
+                  borderRadius: "8px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px"
+                }}
+              >
+                <span>{i + 1}.</span>
+                {item.image && (
+                  <img
+                    src={item.image}
+                    alt={item.item}
+                    style={{ width: "36px", height: "24px", objectFit: "cover", borderRadius: "4px" }}
+                  />
+                )}
+                <span>{item.item} ({item.number})</span>
+              </div>
+            );
+          })}
 
           <h3>Correct Order</h3>
           {correctOrder.map((item, i) => (
@@ -371,8 +412,73 @@ export default function App() {
       {status === "eliminated" && (
         <div>
           <h2>You were eliminated in Round {round}</h2>
-          {eliminatedPlayer && <p style={{ color: "#b91c1c", fontWeight: "bold" }}>{eliminatedPlayer} was eliminated</p>}
+          {lifeLostPlayers.length > 0 && (
+            <p style={{ color: "#92400e", fontWeight: "bold" }}>
+              {lifeLostPlayers.join(", ")} lost 1 life{lifeLostPlayers.length > 1 ? " each" : ""}
+            </p>
+          )}
+          {eliminatedPlayers.length > 0 && (
+            <p style={{ color: "#b91c1c", fontWeight: "bold" }}>
+              {eliminatedPlayers.join(", ")} {eliminatedPlayers.length === 1 ? "was" : "were"} eliminated
+            </p>
+          )}
           {remainingPlayers.length > 0 && <p>Remaining: {remainingPlayers.join(", ")}</p>}
+
+          <h3>Your Order</h3>
+          {submittedOrder.map((item, i) => {
+            const isCorrect = item.item === correctOrder[i]?.item;
+            return (
+              <div
+                key={item.item}
+                style={{
+                  padding: "8px",
+                  marginBottom: "4px",
+                  backgroundColor: isCorrect ? "#dcfce7" : "#fee2e2",
+                  borderRadius: "8px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px"
+                }}
+              >
+                <span>{i + 1}.</span>
+                {item.image && (
+                  <img
+                    src={item.image}
+                    alt={item.item}
+                    style={{ width: "36px", height: "24px", objectFit: "cover", borderRadius: "4px" }}
+                  />
+                )}
+                <span>{item.item} ({item.number})</span>
+              </div>
+            );
+          })}
+
+          <h3>Correct Order</h3>
+          {correctOrder.map((item, i) => (
+            <div
+              key={item.item}
+              style={{
+                padding: "8px",
+                marginBottom: "4px",
+                backgroundColor: "#f5f5f5",
+                borderRadius: "8px",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px"
+              }}
+            >
+              <span>{i + 1}.</span>
+              {item.image && (
+                <img
+                  src={item.image}
+                  alt={item.item}
+                  style={{ width: "36px", height: "24px", objectFit: "cover", borderRadius: "4px" }}
+                />
+              )}
+              <span>{item.item} ({item.number})</span>
+            </div>
+          ))}
+
           <p style={{ color: "gray", marginTop: "12px" }}>Waiting for the final winner...</p>
         </div>
       )}
@@ -385,7 +491,8 @@ export default function App() {
           {/* scoreboard */}
           {results.map((r, i) => (
             <p key={r.name}>
-              #{i + 1} {r.name}: <strong>{r.score} / 100</strong>
+              #{i + 1} {r.name}: <strong>{r.score} / 100</strong> · ❤️ {r.lives}
+              {r.eliminated ? " (eliminated)" : ""}
               {r.name === winner && " 🏆"}
             </p>
           ))}

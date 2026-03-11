@@ -24,6 +24,7 @@ const rooms = {};
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const QUESTIONS_DIR = path.join(__dirname, "questions");
+const STARTING_LIVES = 3;
 
 let questionPool = [];
 
@@ -167,8 +168,16 @@ function resolveRound(room) {
     if (activePlayers.length <= 1) {
         const winner = activePlayers[0]?.name || "";
         const finalResults = room.players
-            .map((player) => ({ name: player.name, score: player.score ?? 0 }))
-            .sort((a, b) => b.score - a.score);
+            .map((player) => ({
+                name: player.name,
+                score: player.score ?? 0,
+                lives: player.lives ?? 0,
+                eliminated: Boolean(player.eliminated),
+            }))
+            .sort((a, b) => {
+                if (b.lives !== a.lives) return b.lives - a.lives;
+                return b.score - a.score;
+            });
 
         broadcast(room, {
             type: "game_over",
@@ -186,29 +195,48 @@ function resolveRound(room) {
         room.players.forEach((player) => {
             player.score = null;
             player.eliminated = false;
+            player.lives = STARTING_LIVES;
         });
         return;
     }
 
-    const ranked = [...activePlayers].sort((a, b) => b.score - a.score);
     const lowestScore = Math.min(...activePlayers.map((player) => player.score ?? 0));
     const lowestPlayers = activePlayers.filter((player) => (player.score ?? 0) === lowestScore);
-    const tiedForLowest = lowestPlayers.length > 1;
 
-    if (!tiedForLowest) {
-        lowestPlayers[0].eliminated = true;
-    }
+    lowestPlayers.forEach((player) => {
+        player.lives = Math.max(0, (player.lives ?? STARTING_LIVES) - 1);
+        if (player.lives === 0) {
+            player.eliminated = true;
+        }
+    });
+
+    const lifeLostPlayers = lowestPlayers.map((player) => player.name);
+    const eliminatedThisRound = lowestPlayers
+        .filter((player) => player.eliminated)
+        .map((player) => player.name);
 
     const remainingPlayers = room.players
         .filter((player) => !player.eliminated)
         .map((player) => player.name);
 
+    const scoreboard = room.players
+        .map((player) => ({
+            name: player.name,
+            score: player.score ?? 0,
+            lives: player.lives ?? 0,
+            eliminated: Boolean(player.eliminated),
+        }))
+        .sort((a, b) => {
+            if (b.lives !== a.lives) return b.lives - a.lives;
+            return b.score - a.score;
+        });
+
     broadcast(room, {
         type: "round_results",
         round: room.round,
-        results: ranked.map((player) => ({ name: player.name, score: player.score })),
-        eliminated: tiedForLowest ? null : lowestPlayers[0].name,
-        tie: tiedForLowest,
+        results: scoreboard,
+        lifeLostPlayers,
+        eliminatedPlayers: eliminatedThisRound,
         remainingPlayers,
         correct: room.roundCorrect || []
     });
@@ -218,7 +246,7 @@ function resolveRound(room) {
         broadcast(room, {
             type: "game_over",
             winner,
-            results: ranked.map((player) => ({ name: player.name, score: player.score })),
+            results: scoreboard,
             correct: room.roundCorrect || []
         });
 
@@ -231,6 +259,7 @@ function resolveRound(room) {
         room.players.forEach((player) => {
             player.score = null;
             player.eliminated = false;
+            player.lives = STARTING_LIVES;
         });
         return;
     }
@@ -260,7 +289,7 @@ wss.on("connection", (ws) => {
 
         if (msg.type === "create") {
             const code = generateCode();
-            currentPlayer = { name: msg.name, ws, score: null, eliminated: false };
+            currentPlayer = { name: msg.name, ws, score: null, eliminated: false, lives: STARTING_LIVES };
             currentRoom = {
                 code,
                 host: msg.name,
@@ -288,7 +317,7 @@ wss.on("connection", (ws) => {
             if (!room) { send(ws, { type: "error", message: "Room not found" }); return; }
             if (room.gameStarted) { send(ws, { type: "error", message: "Game already started" }); return; }
 
-            currentPlayer = { name: msg.name, ws, score: null, eliminated: false };
+            currentPlayer = { name: msg.name, ws, score: null, eliminated: false, lives: STARTING_LIVES };
             currentRoom = room;
             room.players.push(currentPlayer);
 
@@ -313,6 +342,7 @@ wss.on("connection", (ws) => {
             currentRoom.players.forEach((player) => {
                 player.score = null;
                 player.eliminated = false;
+                player.lives = STARTING_LIVES;
             });
 
             console.log(`Game started in room ${currentRoom.code}`);
