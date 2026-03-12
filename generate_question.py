@@ -1,14 +1,49 @@
 import json
 import os
 import re
+from pathlib import Path
 import requests
 from bs4 import BeautifulSoup
 from tavily import TavilyClient
 from groq import Groq
 
+try:
+    load_dotenv = getattr(__import__("dotenv"), "load_dotenv", None)
+except ImportError:
+    load_dotenv = None
+
+def load_local_env() -> None:
+    env_path = Path(__file__).resolve().parent / ".env"
+    if not env_path.exists():
+        return
+
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+if load_dotenv:
+    load_dotenv()
+else:
+    load_local_env()
+
 # ── API Clients ───────────────────────────────────────────────────────────────
-groq_client = Groq(api_key="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")
-tavily_client = TavilyClient(api_key="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")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
+
+if not GROQ_API_KEY:
+    raise ValueError("Missing GROQ_API_KEY. Add it to your environment or .env file.")
+if not TAVILY_API_KEY:
+    raise ValueError("Missing TAVILY_API_KEY. Add it to your environment or .env file.")
+
+groq_client = Groq(api_key=GROQ_API_KEY)
+tavily_client = TavilyClient(api_key=TAVILY_API_KEY)
 
 HEADERS = {"User-Agent": "TriviaGame/1.0 (owenchenyp@gmail.com)"}
 
@@ -98,13 +133,13 @@ def generate_items_with_llm(topic: str, context: str) -> dict:
 
     full_response = ""
     completion = groq_client.chat.completions.create(
-        model="openai/gpt-oss-120b",
+        model="openai/gpt-oss-20b",
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": user_prompt},
         ],
         temperature=0.2,
-        max_completion_tokens=4096,
+        max_completion_tokens=8888,
         top_p=1,
         reasoning_effort="medium",
         stream=True,
@@ -221,19 +256,19 @@ def generate_topic_list(n: int = 20) -> list[str]:
         "countries, cities, sports teams, animals, companies, universities, movies, etc.\n\n"
 
         "Rules:\n"
-        "- Each topic must rank a complete category (e.g. 'all NBA teams', 'all Canadian provinces', "
-        "'all US states', 'all Premier League teams in the 2023–24 season')\n"
+        "- Each topic must rank a complete category (e.g. 'all Canadian provinces', "
+        "'all US states', 'all Canadian universities')\n"
         "- Each topic must specify a clear numeric metric to rank by "
         "(e.g. 'by population', 'by area', 'by franchise value', 'by enrollment')\n"
-        "- The category must contain at least 20 items\n"
+        "- The category must contain at least 15 items, if there are less than 15, do not include it\n"
         "- Topics should be diverse — mix geography, sports, entertainment, nature, and business\n"
         "- Categories should be stable and well-known\n"
         "- Avoid obscure or highly technical topics\n"
         "- Avoid rapidly changing metrics like daily rankings or stock prices\n\n"
+        "- Avoid specific sports leagues like the NBA or Premier League, but allow general sports\n\n"
 
         "Examples of good topics:\n"
         "- 'all Canadian universities by enrollment'\n"
-        "- 'all NBA teams by franchise value'\n"
         "- 'all US states by population'\n"
 
         "Respond ONLY with a valid Python list of strings, nothing else. "
@@ -243,19 +278,30 @@ def generate_topic_list(n: int = 20) -> list[str]:
     user_prompt = f"Generate {n} diverse and engaging ranking trivia topics."
 
     completion = groq_client.chat.completions.create(
-        model="openai/gpt-oss-120b",
+        model="openai/gpt-oss-20b",
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": user_prompt},
         ],
-        temperature=1.5,   # higher temp for more variety
-        max_completion_tokens=1024,
+        temperature=2,   # higher temp for more variety
+        max_completion_tokens=4096,
         stream=False,
     )
 
-    raw = completion.choices[0].message.content.strip()
-    clean = re.sub(r"```(?:python)?", "", raw).strip().strip("`").strip()
-    return json.loads(clean)  # valid Python lists are also valid JSON
+    raw = completion.choices[0].message.content
+    
+    # Debug: show what the model actually returned
+    print(f"  [topic_list] Raw response ({len(raw)} chars): {raw[:300]}")
+    
+    if not raw or not raw.strip():
+        raise ValueError("generate_topic_list: LLM returned empty response")
+
+    clean = re.sub(r"```(?:json|python)?", "", raw).strip().strip("`").strip()
+    
+    # Handle Python-style single-quoted lists
+    clean = clean.replace("'", '"')
+    
+    return json.loads(clean)
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 if __name__ == "__main__":
@@ -265,8 +311,10 @@ if __name__ == "__main__":
     n = 0
     new_topics = []
     
-    topics = generate_topic_list(10)
-    # topics = ["all canadian universities by enrollment"]
+    # topics = generate_topic_list(10)
+    topics = ["all letters in the English alphabet by frequency in English text", 
+              "all chemical elements by melting point",
+              ]
     for topic in topics:
         filename = topic_to_filename(topic)
         out_file = os.path.join(questions_dir, f"{filename}.js")
